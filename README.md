@@ -1,3 +1,3 @@
 # WeBotbot
-基于itchat的Wechat机器人，可实现自动回复消息与通过微信控制电脑
+基于itchat的Wechat机器人，可实现自动回复消息与通过微信控制电脑\n
 感谢大神提供的itchat库，也感谢github其他大神提供的类似开源项目为小弟打开了大门
