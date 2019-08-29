@@ -52,7 +52,7 @@ plans = 2
 # 计划任务时间格式为 hours:mins:secs
 timing = ['16:18:0' , '16:20:0']
 # 提示信息
-noticeMsg = [ {u"FUCK！！！\n"\
+noticeMsg = [ u"FUCK！！！\n"\
               u"你好像还没关机，宝贝\n"\
               u"--请发送 *关机 关闭电脑，乖~\n"
               ,
