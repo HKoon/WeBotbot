@@ -178,6 +178,8 @@ def get_TulingReply(msg,user,userid):
     else:
         itchat.send(defaultReply, toUserName=userid)
 
+
+# 执行指令
 def get_Reaction(message,userid):
 
     #判断是不是指令
@@ -186,32 +188,39 @@ def get_Reaction(message,userid):
         if message == "*傻狗":
             win32api.MessageBox(0, "微信来消息啦", "傻狗信息",win32con.MB_OK) # 接收到消息弹框提醒
             itchat.send("来啦来啦", toUserName=userid)
+
         elif message == "*我是傻狗":
             itchat.send("傻狗，你咋不上天，还想关我电脑", toUserName=userid)
+
         # cmd命令，可以实现远程操作电脑
         elif message[0:4] == "*cmd":
             print("执行命令行")
             os.system(message.strip(message[0:5])) # 获得指令的另一种写法，实际和*open一个功能
             itchat.send(" >>喳", toUserName=userid)
+
         # 待机命令
         elif message == "*待机":
             print("准备待机")
             itchat.send(" >>待机成功", toUserName=userid)
             os.system("rundll32.exe powrProf.dll SetSuspendState")
-        # 关机命令
-        elif message == "*关机*":
+
+        # 关机命令, 仅支持自己控制
+        elif message == "*关机" and userid == "filehelper":
             print("正在关机")
             itchat.send(" >>正在关机", toUserName=userid)
             os.system("shutdown -s -t 10")
+
         # 截屏查看当前工作桌面
         elif message == "*截屏":
             print("正在截屏")
             get_SceenShot(userid)
+
         # cmd打开文件夹或应用程序 可自行修改
         elif message.split("|")[0] == "*open":
             print("打开")
             os.system(message.split("|")[1])
             itchat.send(" >>喳", toUserName=userid)
+
         #下载文件指令
         elif message.split("|")[0] == "*download":
             print("下载文件"+message.split("|")[1])
@@ -234,10 +243,16 @@ def get_Reaction(message,userid):
 
         # 机器人开关
         elif message == "*观诗音来":
-            ws.robotToVip = True
+            if userid == "filehelper":
+                ws.robotToVip = True
+            elif not userid in tulingList:
+                tulingList.append(userid)
             itchat.send(" >>已开启机器人观诗音，现在不需要加 - 也可以和小鸡儿机器人聊天啦", toUserName=userid)
         elif message == "*观诗音走":
-            ws.robotToVip = False
+            if userid == "filehelper":
+                ws.robotToVip = False
+            elif userid in tulingList:
+                tulingList.remove(userid)
             itchat.send(" >>已关闭机器人观诗音，如果要临时召唤她，请在信息最开头加 - ", toUserName=userid)
 
         # 本人专用设置
@@ -263,7 +278,7 @@ def get_Reaction(message,userid):
                 print(permissionUser)
                 itchat.send(" 删除成功", toUserName=userid)
             except:
-                itchat.send(" 没找到这个人", toUserName=userid)
+                itchat.send(" 这个人并没有获得授权", toUserName=userid)
                 
 
     #如果非指令则和图灵机器人聊天
@@ -272,10 +287,13 @@ def get_Reaction(message,userid):
             print("开始和小鸡儿器人聊天")
             user = "koon"
             get_TulingReply(message,user,"filehelper")
-        elif message[0] == "-" or ws.robotToVip:
+        elif message[0] == "-":
             print("小鸡儿机器人正在和别人聊天")
             user = userid[1:10] #取其中若干个字符做为机器人user标识
             get_TulingReply(message[1:],user,userid)
+        elif userid in tulingList and ws.robotToVip:
+            user = userid[1:10]
+            get_TulingReply(message,user,userid)
 
 
 # 自动回应个人消息
