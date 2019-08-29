@@ -2,6 +2,7 @@
 import WeBotbot_setting as ws
 import itchat #微信核心库
 import os
+import platform
 import time
 import win32api,win32con #提示框库
 import requests
@@ -10,68 +11,108 @@ from threading import Thread #多线程
 from apscheduler.schedulers.blocking import BlockingScheduler #计划任务
 import io #发送图片使用
 
+# 根据昵称等取UserName
 def get_UserName(names):
-    guan = []
+    permissionUser = []
     for get_name in names:
         try:
-            guan.append(itchat.search_friends(remarkName=get_name)[0]['UserName']) #备注名匹配
+            permissionUser.append(itchat.search_friends(remarkName=get_name)[0]['UserName']) #备注名匹配
         except:
             try:
-                guan.append(itchat.search_friends(nickName=get_name)[0]['UserName']) #昵称匹配
+                permissionUser.append(itchat.search_friends(nickName=get_name)[0]['UserName']) #昵称匹配
             except:
                 try:
-                    guan.append(itchat.search_friends(Alias=get_name)[0]['UserName']) #微信号匹配
-
+                    permissionUser.append(itchat.search_friends(Alias=get_name)[0]['UserName']) #微信号匹配
                 except:
                     print('没找到'+str(get_name)+'这号人物')
-    return guan
+    return permissionUser
+
+# 截屏模块
+def get_ImagePath():
+    if not os.path.exists("./ScreenShoot/"):
+        os.mkdir("./ScreenShoot/")
+    return "./ScreenShoot/"
+
+
+def get_SceenShot(userid):
+    im_path = get_ImagePath()
+    im_name = "{}{}.{}".format(im_path, int(time.time()), "png")
+    im = None
+
+    if platform.system() == 'Windows' or platform.system() == 'Darwin':
+        try:
+            from PIL import ImageGrab
+            im = ImageGrab.grab()
+        except OSError as e:
+            itchat.send("截图失败，请重试。", toUserName=userid)
+            return
+
+    elif platform.system() == 'Linux':
+        try:
+            import pyscreenshot as ImageGrab
+            im = ImageGrab.grab()
+        except OSError as e:
+            itchat.send("截图失败，请重试。", toUserName=userid)
+            return
+    im.save(im_name)
+
+    if os.path.exists(im_name):
+        try:
+            itchat.send_image(im_name, toUserName=userid)
+        except BaseException as e:
+            import traceback
+            traceback.print_exc()
+            itchat.send("发送截图失败，请重试。", toUserName=userid)
+    else:
+        itchat.send("截图失败，请重试。", toUserName=userid)
 
 # 设置计划任务模块
-def scheduler():
+def set_Scheduler(timing,noticeMsg):
     sched = BlockingScheduler()
-    sched.add_job(send_notice, 'cron', hour=11,minute=59,second=59) #定时发送提醒
+    sched.add_job(send_Notice, 'cron', hour=int(timing.split(":")[0]),minute=int(timing.split(":")[1]),second=int(timing.split(":")[2]),args=[noticeMsg]) #定时发送提醒
     sched.start()
     print('已启动计划任务')
 
-def send_notice():
-    itchat.send(ws.shutdownMsg, toUserName='filehelper')
-    print('发送关机提醒')
+def send_Notice(noticeMsg):
+    itchat.send(noticeMsg, toUserName='filehelper')
+    print('发送计划提醒')
 
-def get_dict(lists,towhom):
-    for list_dicts in lists:
-        list_dict(list_dicts,towhom)
+def get_Dict(lists,userid):
+    for list_Dicts in lists:
+        list_Dict(list_Dicts,userid)
 
 # 递归遍历字典里的内容，并按类型发送消息
-def list_dict(dicts,towhom):
+def list_Dict(dicts,userid):
     if type(dicts) == list: 
-        get_dict(dicts,towhom)
+        get_Dict(dicts,userid)
     else:
         print('开始遍历')
         for key,value in dicts.items():
             try: #尝试遍历子级字典或列表
                 print('\nKeys:'+key)
-                list_dict(value,towhom)
+                list_Dict(value,userid)
             except AttributeError: #不存在子级则代表已取出内容，根据类型回复消息，目前只捣鼓了 新闻 和 一般文字回复
                 print('\nKeys:'+key+'value:'+str(value)+'\n')
                 if key == 'text':
-                    itchat.send(value,toUserName=towhom)
+                    itchat.send('>'+value,toUserName=userid)
                 if key == 'name':
-                    itchat.send(value,toUserName=towhom)
+                    itchat.send('>'+value,toUserName=userid)
                 if key == 'icon' and value:
                     # 取网络图片暂存
-                    url = 'http:'+str(value)
-                    img = requests.get(url, stream=True)
+                    if value[0] == '/': #返回的URL格式不一致，需要看情况补全
+                       value = 'http:'+str(value)
+                    img = requests.get(value, stream=True)
                     imageStorage = io.BytesIO()
                     for block in img.iter_content(1024):
                         imageStorage.write(block)
                     imageStorage.seek(0)
-                    itchat.send_image(imageStorage,toUserName=towhom)
+                    itchat.send_image(imageStorage,toUserName=userid)
                 if key == 'detailurl':
-                    itchat.send(value,toUserName=towhom)
-                    time.sleep(1.8) #为了避免多条新闻轰炸（微信也不允许连发过多），设置了延时
+                    itchat.send('>'+value,toUserName=userid)
+                    time.sleep(3) #为了避免多条新闻轰炸（微信也不允许连发过多），设置了延时
 
 
-def get_response(msg,user):
+def get_Response(msg,user):
     print('请求图灵回复')
     # 构造了要发送给服务器的数据
     apiUrl = 'http://openapi.tuling123.com/openapi/api/v2'
@@ -108,45 +149,15 @@ def get_response(msg,user):
         return
 
 # 图灵机器人回复模块
-def tuling_reply(msg,user,towhom):
+def get_TulingReply(msg,user,userid):
     defaultReply = '闭嘴，说人话' # 为了保证在图灵Key出现问题的时候仍旧可以回复，这里设置一个默认回复
-    reply = get_response(msg,user) # 如果图灵Key出现问题，那么reply将会是None
+    reply = get_Response(msg,user) # 如果图灵Key出现问题，那么reply将会是None
     if reply:
-        list_dict(reply,towhom)
+        list_Dict(reply,userid)
     else:
-        itchat.send(defaultReply, toUserName=towhom)
+        itchat.send(defaultReply, toUserName=userid)
 
-def get_reaction(message,userid):
-
-    # cmd命令，可以实现远程操作电脑
-    if message[0:4] == "*cmd":
-        print('执行命令行')
-        os.system(message.strip(message[1:5]))
-    # 待机命令
-    elif message == '*待机':
-        print('准备待机')
-        os.system('rundll32.exe powrProf.dll SetSuspendState')
-        # 关机命令
-    elif message == '*关机':
-        print('正在关机')
-        os.system('shutdown -s -t 10')
-    # cmd打开应用程序 可自行修改
-    elif message.split(" ")[0] == '*open':
-        print('打开')
-        os.system(message.split(' ')[1])
-    elif message.split(" ")[0] == '*download':#下载文件指令
-        itchat.send_file(message.split(' ')[1], toUserName=userid)
-    elif message.split(" ")[0] == 'cd':#拦截cd命令通过os.chdir来实现目录切换
-        os.chdir(msg['Text'].split(' ')[1])
-    elif userid == 'filehelper':
-        print('开始和小鸡儿器人聊天')
-        user = 'koon'
-        tuling_reply(message,user,'filehelper')
-    elif message[0] == '-' or ws.robotToVip:
-        print('小鸡儿机器人正在和别人聊天')
-        user = userid[1:10] #取其中若干个字符做为机器人user标识
-        tuling_reply(message[1:],user,userid)
-
+def get_Reaction(message,userid):
 
     #定制提醒及回复
     if message == '-傻狗':
@@ -154,6 +165,46 @@ def get_reaction(message,userid):
         itchat.send('来啦来啦', toUserName=userid)
     elif message == '-我是傻狗':
         itchat.send('傻狗，你咋不上天，还想关我电脑', toUserName=userid)
+    # cmd命令，可以实现远程操作电脑
+    elif message[0:4] == "*cmd":
+        print('执行命令行')
+        os.system(message.strip(message[1:5]))
+        itchat.send('>喳<', toUserName=userid)
+    # 待机命令
+    elif message == '*待机':
+        print('准备待机')
+        itchat.send('>>待机成功', toUserName=userid)
+        os.system('rundll32.exe powrProf.dll SetSuspendState')
+    # 关机命令
+    elif message == '*关机*':
+        print('正在关机')
+        itchat.send('>>正在关机', toUserName=userid)
+        os.system('shutdown -s -t 10')
+    # 截屏查看当前工作桌面
+    elif message == '*截屏':
+        print('正在截屏')
+        get_SceenShot(userid)
+    # cmd打开应用程序 可自行修改
+    elif message.split(" ")[0] == '*open':
+        print('打开')
+        os.system(message.split(' ')[1])
+        itchat.send('>喳<', toUserName=userid)
+    elif message.split(" ")[0] == '*download':#下载文件指令
+        print('下载文件'+message.split(' ')[1])
+        itchat.send_file(message.split(' ')[1], toUserName=userid)
+    elif message.split(" ")[0] == '*cd':#拦截cd命令通过os.chdir来实现目录切换
+        os.chdir(message.split(' ')[1])
+        itchat.send('>>已经切换目录', toUserName=userid)
+    #如果非指令则和图灵机器人聊天
+    else:
+        if userid == 'filehelper':
+            print('开始和小鸡儿器人聊天')
+            user = 'koon'
+            get_TulingReply(message,user,'filehelper')
+        elif message[0] == '-' or ws.robotToVip:
+            print('小鸡儿机器人正在和别人聊天')
+            user = userid[1:10] #取其中若干个字符做为机器人user标识
+            get_TulingReply(message[1:],user,userid)
 
 
 # 自动回应个人消息
@@ -167,25 +218,26 @@ def text_reply(msg):
     # 如果发送消息给文件传输助手
     if msg.toUserName == 'filehelper':
         # 显示命令内容
-        print(msg['Content'])
-        get_reaction(message,'filehelper')
+        print(userid+":"+msg['Content'])
+        if not message[0] == '>': # 避免图灵回应自己发送的信息
+            get_Reaction(message,'filehelper')
     elif userid in permissionUser: # 有权限用户同样获得控制权
-        print(msg['Content'])
-        get_reaction(message,userid)
+        print(userid+":"+msg['Content'])
+        get_Reaction(message,userid)
     else:
         if ws.robotToAll:
-            tuling_reply(message,user,userid)
+            get_TulingReply(message,user,userid)
             
-
-
 
 if __name__ == '__main__':
     itchat.auto_login(hotReload=True, enableCmdQR=True)
 
     #多线程运行计划任务
-    myplan = Thread(target=scheduler, args=())
-    myplan.start()
-    print('已启动多线程')
+    for i in range(ws.plans):
+        myplan = Thread(target=set_Scheduler, args=(ws.timing[i],ws.noticeMsg[i]))
+        myplan.start()
+        print('启动第'+str(i+1)+'个任务，时间'+ ws.timing[i]+'\n'+ws.noticeMsg[i])
+    print('已启动多线程,共'+str(i+1)+'个任务')
 
     # 根据permissionUserName内容自动取得UserName
     permissionUser = get_UserName(ws.permissionUserName)
