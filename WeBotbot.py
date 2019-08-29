@@ -12,19 +12,26 @@ from apscheduler.schedulers.blocking import BlockingScheduler #计划任务
 import io #发送图片使用
 
 # 根据昵称等取UserName
-def get_UserName(names):
-    permissionUser = []
-    for get_name in names:
+def get_UserName(get_name):
+    try:
+        UserName = itchat.search_friends(remarkName=get_name)[0]["UserName"] #备注名匹配
+    except:
         try:
-            permissionUser.append(itchat.search_friends(remarkName=get_name)[0]["UserName"]) #备注名匹配
+            UserName = itchat.search_friends(nickName=get_name)[0]["UserName"]#昵称匹配
         except:
             try:
-                permissionUser.append(itchat.search_friends(nickName=get_name)[0]["UserName"]) #昵称匹配
+                UserName = itchat.search_friends(Alias=get_name)[0]["UserName"] #微信号匹配
             except:
-                try:
-                    permissionUser.append(itchat.search_friends(Alias=get_name)[0]["UserName"]) #微信号匹配
-                except:
-                    print("没找到"+str(get_name)+"这号人物")
+                print("没找到"+str(get_name)+"这号人物")
+    print(UserName)
+    return UserName
+
+def get_permissionUser(names,permissionUser):
+    for get_name in names:
+        try:
+            permissionUser.append(get_UserName(get_name)) #备注名匹配
+        except:
+            print("没找到"+str(get_name)+"这号人物")
     return permissionUser
 
 # 截屏模块
@@ -241,26 +248,23 @@ def get_Reaction(message,userid):
             ws.robotToAll = False
             itchat.send(" >>观诗音自闭了，如果要临时召唤她，请在信息最开头加 - ", toUserName=userid)
         elif message.split("|")[0] == "*授权" and userid == "filehelper":
-            ws.permissionUserName.append(message.split("|")[1])
-            #重新获取授权用户UserName
-            oldUser = permissionUser
-            permissionUser = get_UserName(ws.permissionUserName)
-            if permissionUser == oldUser:
-                itchat.send(" 没找到这个人", toUserName=userid)
-            else:
+            try:
+                print(permissionUser)
+                permissionUser.append(get_UserName(message.split("|")[1]))
+                print(permissionUser)
                 itchat.send(" 添加成功", toUserName=userid)
-                itchat.send(" 当前授权用户：\n"+str(ws.permissionUserName), toUserName=userid)
                 itchat.send(ws.myMsg, toUserName=permissionUser[-1])
-        elif message.split("|")[0] == "*夺权" and userid == "filehelper":
-            ws.permissionUserName.remove(message.split("|")[1])
-            #重新获取授权用户UserName
-            oldUser = permissionUser
-            permissionUser = get_UserName(ws.permissionUserName)
-            if permissionUser == oldUser:
+            except:
                 itchat.send(" 没找到这个人", toUserName=userid)
-                itchat.send(" 当前授权用户：\n"+str(ws.permissionUserName), toUserName=userid)
-            else:
+        elif message.split("|")[0] == "*夺权" and userid == "filehelper":
+            try:
+                print(permissionUser)
+                permissionUser.remove(get_UserName(message.split("|")[1]))
+                print(permissionUser)
                 itchat.send(" 删除成功", toUserName=userid)
+            except:
+                itchat.send(" 没找到这个人", toUserName=userid)
+                
 
     #如果非指令则和图灵机器人聊天
     else:
@@ -313,7 +317,8 @@ if __name__ == "__main__":
     print("已启动多线程,共"+str(i+1)+"个任务")
 
     # 根据permissionUserName内容自动取得UserName
-    permissionUser = get_UserName(ws.permissionUserName)
+    permissionUser = []
+    permissionUser = get_permissionUser(ws.permissionUserName,permissionUser)
     for username in permissionUser:
         itchat.send(ws.myMsg, toUserName=username) #发通知已经开启功能
 
