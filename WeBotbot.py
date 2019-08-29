@@ -67,9 +67,23 @@ def get_SceenShot(userid):
         itchat.send("截图失败，请重试。", toUserName=userid)
 
 # 设置计划任务模块
+def add_Plan(timing,noticeMsg):
+    ws.plans += 1
+    ws.timing.append(timing)
+    ws.noticeMsg.append(noticeMsg)
+    myplan = Thread(target=set_Scheduler, args=(timing,noticeMsg))
+    myplan.start()
+    itchat.send(" >>将会在 "+timing+"提醒你:\n"+noticeMsg, toUserName="filehelper")
+
+def del_Plan():
+    ws.plans = 0
+    ws.timing = []
+    ws.noticeMsg = []
+    itchat.send("已清空提醒", toUserName="filehelper")
+
 def set_Scheduler(timing,noticeMsg):
     sched = BlockingScheduler()
-    sched.add_job(send_Notice, "cron", hour=int(timing.split("|")[0]),minute=int(timing.split("|")[1]),second=int(timing.split("|")[2]),args=[noticeMsg]) #定时发送提醒
+    sched.add_job(send_Notice, "cron", hour=int(timing.split(":")[0]),minute=int(timing.split(":")[1]),second=int(timing.split(":")[2]),args=[noticeMsg]) #定时发送提醒
     sched.start()
     print("已启动计划任务")
 
@@ -159,62 +173,98 @@ def get_TulingReply(msg,user,userid):
 
 def get_Reaction(message,userid):
 
-    #定制提醒及回复
-    if message == "-傻狗":
-        win32api.MessageBox(0, "微信来消息啦", "傻狗信息",win32con.MB_OK) # 接收到消息弹框提醒
-        itchat.send("来啦来啦", toUserName=userid)
-    elif message == "-我是傻狗":
-        itchat.send("傻狗，你咋不上天，还想关我电脑", toUserName=userid)
-    # cmd命令，可以实现远程操作电脑
-    elif message[0:4] == "*cmd":
-        print("执行命令行")
-        os.system(message.strip(message[0:5])) # 获得指令的另一种写法，实际和*open一个功能
-        itchat.send(" >>喳", toUserName=userid)
-    # 待机命令
-    elif message == "*待机":
-        print("准备待机")
-        itchat.send(" >>待机成功", toUserName=userid)
-        os.system("rundll32.exe powrProf.dll SetSuspendState")
-    # 关机命令
-    elif message == "*关机*":
-        print("正在关机")
-        itchat.send(" >>正在关机", toUserName=userid)
-        os.system("shutdown -s -t 10")
-    # 截屏查看当前工作桌面
-    elif message == "*截屏":
-        print("正在截屏")
-        get_SceenShot(userid)
-    # cmd打开文件夹或应用程序 可自行修改
-    elif message.split("|")[0] == "*open":
-        print("打开")
-        os.system(message.split("|")[1])
-        itchat.send(" >>喳", toUserName=userid)
-    elif message.split("|")[0] == "*download":#下载文件指令
-        print("下载文件"+message.split("|")[1])
-        itchat.send_file(message.split("|")[1], toUserName=userid)
-    elif message.split("|")[0] == "*cd":#拦截cd命令通过os.chdir来实现目录切换
-        os.chdir(message.split("|")[1])
-        itchat.send(" >>已经切换目录", toUserName=userid)
-    elif message.split("|")[0] == "*plan":
-        myplan = Thread(target=set_Scheduler, args=(message.split("|")[1],message.split("|")[2]))
-        myplan.start()
-        itchat.send(" >>将会在"+message.split("|")[1]+"提醒你"+message.split("|")[2], toUserName=userid)
-    # 机器人开关
-    elif message == "*观诗音来":
-        ws.robotToVip = True
-        itchat.send(" >>已开启机器人观诗音，现在不需要加 - 也可以和小鸡儿机器人聊天啦", toUserName=userid)
-    elif message == "*观诗音走":
-        ws.robotToVip = False
-        itchat.send(" >>已关闭机器人观诗音，如果要临时召唤她，请在信息最开头加 - ", toUserName=userid)
-    elif message == "*观诗音开大":
-        ws.robotToAll = True
-        itchat.send(" >>观诗音撩骚全场，会自动回复全部好友（不包括群聊）", toUserName=userid)
-    elif message == "*闭嘴":
-        ws.robotToAll = False
-        itchat.send(" >>观诗音自闭了，如果要临时召唤她，请在信息最开头加 - ", toUserName=userid)
+    #判断是不是指令
+    if message[0] == "*": 
+        #定制提醒及回复
+        if message == "*傻狗":
+            win32api.MessageBox(0, "微信来消息啦", "傻狗信息",win32con.MB_OK) # 接收到消息弹框提醒
+            itchat.send("来啦来啦", toUserName=userid)
+        elif message == "*我是傻狗":
+            itchat.send("傻狗，你咋不上天，还想关我电脑", toUserName=userid)
+        # cmd命令，可以实现远程操作电脑
+        elif message[0:4] == "*cmd":
+            print("执行命令行")
+            os.system(message.strip(message[0:5])) # 获得指令的另一种写法，实际和*open一个功能
+            itchat.send(" >>喳", toUserName=userid)
+        # 待机命令
+        elif message == "*待机":
+            print("准备待机")
+            itchat.send(" >>待机成功", toUserName=userid)
+            os.system("rundll32.exe powrProf.dll SetSuspendState")
+        # 关机命令
+        elif message == "*关机*":
+            print("正在关机")
+            itchat.send(" >>正在关机", toUserName=userid)
+            os.system("shutdown -s -t 10")
+        # 截屏查看当前工作桌面
+        elif message == "*截屏":
+            print("正在截屏")
+            get_SceenShot(userid)
+        # cmd打开文件夹或应用程序 可自行修改
+        elif message.split("|")[0] == "*open":
+            print("打开")
+            os.system(message.split("|")[1])
+            itchat.send(" >>喳", toUserName=userid)
+        #下载文件指令
+        elif message.split("|")[0] == "*download":
+            print("下载文件"+message.split("|")[1])
+            itchat.send_file(message.split("|")[1], toUserName=userid)
+        #拦截cd命令通过os.chdir来实现目录切换
+        elif message.split("|")[0] == "*cd":
+            os.chdir(message.split("|")[1])
+            itchat.send(" >>已经切换目录", toUserName=userid)
+
+        #设置提醒
+        elif message.split("|")[0] == "*plan":
+            if userid == "filehelper":
+                add_Plan(message.split("|")[1],message.split("|")[2])
+            else: #目前数据结构其他用户只能建立临时提醒任务
+                myplan = Thread(target=set_Scheduler, args=(message.split("|")[1],message.split("|")[2]))
+                myplan.start()
+                itchat.send(" 我将会在 "+timing+"提醒你:\n"+noticeMsg, toUserName=userid) 
+        elif message == "*delplan" and userid == "filehelper":
+            del_Plan()
+
+        # 机器人开关
+        elif message == "*观诗音来":
+            ws.robotToVip = True
+            itchat.send(" >>已开启机器人观诗音，现在不需要加 - 也可以和小鸡儿机器人聊天啦", toUserName=userid)
+        elif message == "*观诗音走":
+            ws.robotToVip = False
+            itchat.send(" >>已关闭机器人观诗音，如果要临时召唤她，请在信息最开头加 - ", toUserName=userid)
+
+        # 本人专用设置
+        elif message == "*开大" and userid == "filehelper":
+            ws.robotToAll = True
+            itchat.send(" >>观诗音撩骚全场，会自动回复全部好友（不包括群聊）", toUserName=userid)
+        elif message == "*闭嘴" and userid == "filehelper":
+            ws.robotToAll = False
+            itchat.send(" >>观诗音自闭了，如果要临时召唤她，请在信息最开头加 - ", toUserName=userid)
+        elif message.split("|")[0] == "*授权" and userid == "filehelper":
+            ws.permissionUserName.append(message.split("|")[1])
+            #重新获取授权用户UserName
+            oldUser = permissionUser
+            permissionUser = get_UserName(ws.permissionUserName)
+            if permissionUser == oldUser:
+                itchat.send(" 没找到这个人", toUserName=userid)
+            else:
+                itchat.send(" 添加成功", toUserName=userid)
+                itchat.send(" 当前授权用户：\n"+str(ws.permissionUserName), toUserName=userid)
+                itchat.send(ws.myMsg, toUserName=permissionUser[-1])
+        elif message.split("|")[0] == "*夺权" and userid == "filehelper":
+            ws.permissionUserName.remove(message.split("|")[1])
+            #重新获取授权用户UserName
+            oldUser = permissionUser
+            permissionUser = get_UserName(ws.permissionUserName)
+            if permissionUser == oldUser:
+                itchat.send(" 没找到这个人", toUserName=userid)
+                itchat.send(" 当前授权用户：\n"+str(ws.permissionUserName), toUserName=userid)
+            else:
+                itchat.send(" 删除成功", toUserName=userid)
+
     #如果非指令则和图灵机器人聊天
     else:
-        if userid == "filehelper":
+        if userid == "filehelper": 
             print("开始和小鸡儿器人聊天")
             user = "koon"
             get_TulingReply(message,user,"filehelper")
@@ -255,7 +305,7 @@ def text_reply(msg):
 if __name__ == "__main__":
     itchat.auto_login(hotReload=True, enableCmdQR=True)
 
-    #多线程运行计划任务
+    #预设任务提醒
     for i in range(ws.plans):
         myplan = Thread(target=set_Scheduler, args=(ws.timing[i],ws.noticeMsg[i]))
         myplan.start()
