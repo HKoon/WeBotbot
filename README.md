@@ -12,8 +12,8 @@ WeBot.py - 主程序
 setting.xls - 初始配置
 配表可实现微信修改表格信息，具体实现也在代码中做了尝试
 
-本版本也封装好了一个可独立运行的exe，与setting表格放在同一目录下即可。 
-网盘地址：https://pan.baidu.com/s/1p7g5WK8mcq6KMdPXsEWURw 提取码 0edx
+**本版本也封装好了一个可独立运行的exe，与setting表格放在同一目录下即可。  
+网盘地址：https://pan.baidu.com/s/1p7g5WK8mcq6KMdPXsEWURw 提取码 0edx**
 
 
 [非配表版本]代码文件：  
