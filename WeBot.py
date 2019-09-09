@@ -8,6 +8,7 @@ import requests
 import json
 from threading import Thread #多线程
 from apscheduler.schedulers.blocking import BlockingScheduler #计划任务
+from apscheduler.triggers.cron import CronTrigger
 import io #发送图片使用
 
 #配表摸块
@@ -47,7 +48,7 @@ def get_dataDict(file, colnameindex, by_name):
 def update_dataDict(file, dataDict):
     if not os.path.isfile(file):
         file = input("未找到配表,请手动将表格拖进来:")
-    workbook = xlwt.workbook()
+    workbook = xlwt.Workbook(encoding = 'utf-8')
     worksheet = workbook.add_sheet("setting")
     row = 0
     for key, values in dataDict.items():
@@ -55,11 +56,14 @@ def update_dataDict(file, dataDict):
         col = 1
         for value in values:
             worksheet.write(row, col, value)
+            print(col)
             col += 1
         row += 1
     try:
         os.remove(file)
         workbook.save(file)
+        itchat.send("改表成功", toUserName="filehelper")
+        print("改表成功")
     except Exception as e:
         print(str(e))
 
@@ -158,11 +162,14 @@ def del_Plan():
         update_dataDict(excel,initData)
         itchat.send("已清空默认提醒", toUserName="filehelper")
     except:
+        itchat.send("删除失败,需要手动改表哦", toUserName="filehelper")
         print("删除失败,需要手动改一下哦")
 
 def set_Scheduler(timing,noticeMsg):
     sched = BlockingScheduler()
-    sched.add_job(send_Notice, "cron", hour=int(timing.split(":")[0]),minute=int(timing.split(":")[1]),second=int(timing.split(":")[2]),args=[noticeMsg]) #定时发送提醒
+    trigger = CronTrigger(hour=int(timing.split(":")[0]),minute=int(timing.split(":")[1]),second=int(timing.split(":")[2]))
+    sched.add_job(send_Notice, trigger, args=[noticeMsg]) #定时发送提醒
+    #sched.add_job(send_Notice, "cron",hour=int(timing.split(":")[0]),minute=int(timing.split(":")[1]),second=int(timing.split(":")[2]),args=[noticeMsg])
     sched.start()
     print("已启动计划任务")
 
@@ -185,7 +192,7 @@ def list_Dict(dicts,userid):
                 #print("\nKeys:"+key)
                 list_Dict(value,userid)
             except AttributeError: #不存在子级则代表已取出内容，根据类型回复消息，目前只捣鼓了 新闻 和 一般文字回复
-                print("\nKeys:"+key+" value:"+str(value)+"\n")
+                #print("\nKeys:"+key+" value:"+str(value)+"\n")
                 if key == "text":
                     itchat.send(" "+value,toUserName=userid)
                 if key == "name":
@@ -202,7 +209,9 @@ def list_Dict(dicts,userid):
                     itchat.send_image(imageStorage,toUserName=userid)
                 if key == "detailurl":
                     itchat.send(" "+value,toUserName=userid)
-                    time.sleep(3) #为了避免多条新闻轰炸（微信也不允许连发过多），设置了延时
+                    time.sleep(1)
+                    itchat.send("点击链接看详情哟",toUserName=userid)
+                    time.sleep(2) #为了避免多条新闻轰炸（微信也不允许连发过多），设置了延时
 
 
 def get_Response(msg,user):
@@ -319,9 +328,10 @@ def get_Reaction(message,userid):
                 robotToVip = True
                 if not initData['robotToVip']:
                     try:
-                        initData['robotToVip'] = ["开"]
+                        initData['robotToVip'][0] = "开"
                         update_dataDict(excel,initData)
                     except:
+                        itchat.send("删除失败,需要手动改表哦", toUserName="filehelper")
                         print("改表失败,如果想默认开启,记得手动改一下哦")
             elif not userid in tulingList:
                 tulingList.append(userid)
@@ -332,10 +342,14 @@ def get_Reaction(message,userid):
                 robotToVip = False
                 if initData['robotToVip']:
                     try:
-                        initData['robotToVip'] = ["关"]
+                        initData['robotToVip'][0] = "关"
+                        print(robotToVip)
                         update_dataDict(excel,initData)
-                    except:
+                        print("update_dataDict!")
+                    except Exception as e:
+                        itchat.send("删除失败,需要手动改表哦", toUserName="filehelper")
                         print("改表失败,如果想默认关闭,记得手动改一下哦")
+                        print(str(e))
             elif userid in tulingList:
                 tulingList.remove(userid)
             itchat.send(" >>已关闭机器人观诗音，如果要临时召唤她，请在信息最开头加 - ", toUserName=userid)
@@ -363,7 +377,8 @@ def get_Reaction(message,userid):
                         initData['permissionUserName'].append(message.split("|")[1])
                         update_dataDict(excel,initData)
                     except:
-                        print("改表失败,如果想默认开启,记得手动改一下哦")
+                        itchat.send("删除失败,需要手动改表哦", toUserName="filehelper")
+                        print("改表失败,记得手动改一下哦")
             except:
                 itchat.send(" 没找到这个人", toUserName=userid)
 
@@ -377,7 +392,8 @@ def get_Reaction(message,userid):
                         initData['permissionUserName'].remove(message.split("|")[1])
                         update_dataDict(excel,initData)
                     except:
-                        print("改表失败,如果想默认开启,记得手动改一下哦")
+                        itchat.send("删除失败,需要手动改表哦", toUserName="filehelper")
+                        print("改表失败,记得手动改一下哦")
             except:
                 itchat.send(" 这个人并没有获得授权", toUserName=userid)
                 
@@ -436,7 +452,6 @@ if __name__ == "__main__":
     else:
         excel = '.\\setting.xls'
     initData = get_dataDict(excel,0,u'setting') #表格内容以字典形式返回，第一列为keys
-    #print(initData)
 
     # 把字典相关变量取出来,作为全局变量
     permissionUserName = initData['permissionUserName']
@@ -459,9 +474,10 @@ if __name__ == "__main__":
     # 预设任务提醒
     if plansNum > 0:
         for i in range(plansNum):
-            set_Scheduler(timeSet[i],noticeMsg[i])
-            print("启动第"+str(i+1)+"个任务，时间"+ timeSet[i]+"\n"+noticeMsg[i])
-        print("已启动多线程,共"+str(i+1)+"个任务")
+            myplan = Thread(target=set_Scheduler, args=(timeSet[i],noticeMsg[i]))
+            myplan.start()
+            print("启动第"+str(i+1)+"个任务，时间"+ timeSet[i]+"\n"+noticeMsg[i]+"\n")
+        #print("已启动多线程,共"+str(i+1)+"个任务")
 
     # 根据permissionUserName内容自动取得UserName
     permissionUser = []
